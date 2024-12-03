@@ -8,6 +8,12 @@ import json
 
 __version__ = "1.0.0"
 
+secrets = {}
+with open("secrets") as f:
+    for line in f.readlines():
+        ld = line.split("=")
+        secrets[ld[0]] = ld[1]
+
 @arguably.command
 def mask(input: str, output: str, config: str = None):
     '''
@@ -100,7 +106,7 @@ def address(IN: list) -> list:
 
     payload = {}
     headers = {
-    'X-API-Key': '992b93b0'
+    'X-API-Key': secrets["mockaroo"]
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
