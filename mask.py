@@ -4,6 +4,8 @@ import requests
 import random
 import arguably
 
+__version__ = "1.0.0"
+
 @arguably.command
 def mask(input: str, output: str, options: str):
     """
@@ -15,7 +17,15 @@ def mask(input: str, output: str, options: str):
         options: JSON file containing masking options for each field in the tables
     """
 
-    print(redact(input,"#"))
+    import mysql.connector
+
+    mydb = mysql.connector.connect(
+    host="localhost",
+    user="yourusername",
+    password="yourpassword"
+    )
+
+    print(mydb)
 
 
 def redact(IN: str, CHAR: str) -> str:

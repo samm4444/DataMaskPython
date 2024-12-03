@@ -1,0 +1,2 @@
+arguably
+mysql-connector-python
