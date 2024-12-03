@@ -3,33 +3,87 @@ import re
 import requests
 import random
 import arguably
+import mysql.connector
+import json
 
 __version__ = "1.0.0"
 
 @arguably.command
-def mask(input: str, output: str, options: str):
-    """
+def mask(input: str, output: str, config: str = None):
+    '''
     Mask the sensitive data in your mySQL or postgreSQL database
 
     Args:
         input: The address of the input database containing potentially sensitive data
         output: The address for the output database where the masked data will be inserted
-        options: JSON file containing masking options for each field in the tables
-    """
+        config: JSON file containing masking options for each field in the tables
+    '''
+    # mydb = mysql.connector.connect(
+    # host="192.168.1.115",
+    # user="root",
+    # password="h4mster",
+    # port="3306"
+    # )
+    if config != None:
+        data = json.loads(open(config).read())
+        
 
-    import mysql.connector
+    print(regex("ahflkjsdhfakhdsm@skf.com","(?<=^.).*(?=.*@)","******"))
 
-    mydb = mysql.connector.connect(
-    host="localhost",
-    user="yourusername",
-    password="yourpassword"
-    )
+    print(partial("abcdefghijklmnopqrstuvwxyz",0,0,"#"))
 
-    print(mydb)
+
+
+
+def regex(IN: str, pattern: str, replacement: str) -> str:
+    '''
+    Matches with a REGEX pattern and replaces the matching portion with a specific string
+
+    Args:
+        IN (str): Input string to be masked
+        pattern (str): REGEX pattern to match part to be replaced
+        replacement (str): text to replace match with
+
+    Returns:
+        str: The masked string
+    '''
+    return re.sub(pattern,replacement,IN)
+
+
+
+
+def partial(IN: str, visablePrefix: int, visableSuffix: int, maskingChar: str):
+    '''
+    Replaces a portion of a string with a specific character 
+
+    Args:
+        IN (str): Input string to be masked
+        visablePrefix (int): Number of characters, at the start, to be visable
+        visableSuffix (int): Number of characters, at the end, to be visable
+        maskingChar (str): Character to replace the non-visable characters with
+
+    Returns:
+        str: The masked string
+    '''
+    OUT = IN
+    for i in range(visablePrefix,len(IN) - visableSuffix):
+        OUT = OUT[:i] + maskingChar + OUT[i +1:]
+    return OUT
+
+
 
 
 def redact(IN: str, CHAR: str) -> str:
+    '''
+    Replaces all characters of a string with a specific character
 
+    Args:
+        IN (str): Input string to be masked
+        maskingChar (str): Character to replace the characters with
+
+    Returns:
+        str: The masked string
+    '''
     OUT = ""
     for i in IN:
         OUT += CHAR
@@ -41,7 +95,7 @@ def scramble(IN: int, MIN: int = 0, MAX: int = 9) -> int:
         OUT += str(random.randint(MIN,MAX))
     return int(OUT)
 
-def address(IN: list):
+def address(IN: list) -> list:
     url = "https://my.api.mockaroo.com/address.json"
 
     payload = {}

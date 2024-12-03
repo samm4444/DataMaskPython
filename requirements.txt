@@ -1,2 +1,6 @@
 arguably
 mysql-connector-python
+requests
+re
+random
+json

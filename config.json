@@ -1,0 +1,30 @@
+{
+  "fields":
+  {
+    "surname": {
+      "maskingType": "redact",
+      "replacement": "*"
+    },
+    "email": {
+      "maskingType": "regex",
+      "pattern": "([^@]+)@(.+)",
+      "replacement": "***@***"
+    },
+    "phone": {
+      "maskingType": "partial",
+      "visiblePrefix": 3,
+      "visibleSuffix": 2,
+      "maskingChar": "*"
+    },
+    "creditCard": {
+      "maskingType": "partial",
+      "visiblePrefix": 4,
+      "visibleSuffix": 4,
+      "maskingChar": "*"
+    },
+    "dateOfBirth": {
+      "maskingType": "format",
+      "replacementFormat": "****-**-**"
+    }
+  }
+}
