@@ -32,11 +32,25 @@ def mask(input: str, output: str, config: str = None):
     # )
     if config != None:
         data = json.loads(open(config).read())
-        
+        for field, fieldData in data["fields"].items():
+            print(field,end="\n -- ")
+            maskingType = fieldData["maskingType"]
+            if maskingType == None: raise ValueError("No Masking type for field: " + field)
 
-    print(regex("ahflkjsdhfakhdsm@skf.com","(?<=^.).*(?=.*@)","******"))
-
-    print(partial("abcdefghijklmnopqrstuvwxyz",0,0,"#"))
+            if maskingType == "regex":
+                pattern = fieldData["pattern"]
+                replacement = fieldData["replacement"]
+                print(regex("sam@mail.com",pattern,replacement))
+            elif maskingType == "redact":
+                replacement = fieldData["replacement"]
+                print(redact("password",replacement))
+            elif maskingType == "partial":
+                visiblePrefix = fieldData["visiblePrefix"]
+                visibleSuffix = fieldData["visibleSuffix"]
+                replacement = fieldData["replacement"]
+                print(partial("sam@mail.com",visiblePrefix,visibleSuffix,replacement))
+            else:
+                raise ValueError("Unsupported Masking Type: " + maskingType)
 
 
 
@@ -53,26 +67,27 @@ def regex(IN: str, pattern: str, replacement: str) -> str:
     Returns:
         str: The masked string
     '''
+    if pattern == None: raise ValueError("No Pattern to match")
     return re.sub(pattern,replacement,IN)
 
 
 
 
-def partial(IN: str, visablePrefix: int, visableSuffix: int, maskingChar: str):
+def partial(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
     '''
     Replaces a portion of a string with a specific character 
 
     Args:
         IN (str): Input string to be masked
-        visablePrefix (int): Number of characters, at the start, to be visable
-        visableSuffix (int): Number of characters, at the end, to be visable
+        visiblePrefix (int): Number of characters, at the start, to be visable
+        visibleSuffix (int): Number of characters, at the end, to be visable
         maskingChar (str): Character to replace the non-visable characters with
 
     Returns:
         str: The masked string
     '''
     OUT = IN
-    for i in range(visablePrefix,len(IN) - visableSuffix):
+    for i in range(visiblePrefix,len(IN) - visibleSuffix):
         OUT = OUT[:i] + maskingChar + OUT[i +1:]
     return OUT
 
@@ -101,7 +116,7 @@ def scramble(IN: int, MIN: int = 0, MAX: int = 9) -> int:
         OUT += str(random.randint(MIN,MAX))
     return int(OUT)
 
-def address(IN: list) -> list:
+def address(IN: list) -> dict:
     url = "https://my.api.mockaroo.com/address.json"
 
     payload = {}
@@ -121,9 +136,9 @@ def address(IN: list) -> list:
     addressData["country"] = data[4].strip()
     addressData["postcode"] = data[5].strip()
 
-    OUT = []
+    OUT = {}
     for i in IN:
-        OUT.append(addressData[i])
+        OUT[i] = addressData[i]
     return OUT
     
 

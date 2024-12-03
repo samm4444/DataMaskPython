@@ -14,17 +14,18 @@
       "maskingType": "partial",
       "visiblePrefix": 3,
       "visibleSuffix": 2,
-      "maskingChar": "*"
+      "replacement": "*"
     },
     "creditCard": {
       "maskingType": "partial",
       "visiblePrefix": 4,
       "visibleSuffix": 4,
-      "maskingChar": "*"
+      "replacement": "*"
     },
     "dateOfBirth": {
-      "maskingType": "format",
-      "replacementFormat": "****-**-**"
+      "maskingType": "regex",
+      "pattern": "[0-9]",
+      "replacement": "*"
     }
   }
 }
