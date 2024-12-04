@@ -71,7 +71,6 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     logger.debug("Got " + str(len(rows)) + " rows")
 
     outputTable = []
-    # if config != None:
     configData = json.loads(open(config).read())["fields"]
     for row in tqdm(rows, total=len(rows),desc="Masking data"):
         outputRow = {}
@@ -82,7 +81,7 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
             maskData = configData[columnName]
 
             maskingType = maskData["maskingType"]
-            if maskingType == None: raise ValueError("No Masking type for field: " + fieldName)
+            if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
 
             if maskingType == "regex":
                 pattern = maskData["pattern"]
