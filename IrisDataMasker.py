@@ -24,14 +24,14 @@ with open("secrets") as f:
         secrets[ld[0]] = ld[1]
 
 @arguably.command
-def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "INFO"):
+def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     '''
-    Mask the sensitive data in your mySQL or postgreSQL database
+    Mask the sensitive data in your mySQL database
 
     Args:
         inputDB (str): The address of the input database. Format: host:database:table
         outputDB (str): The address for the output database. Format: host:database:table
-        config (str, optional): [-c] JSON file containing masking options for each field in the tables
+        config (str): JSON file containing masking options for each field in the tables. This can be generated using the setup command.
         logLevel (str, optional): [-L] Log level for output (e.g., DEBUG, INFO, WARNING) 
     '''
     logger.setLevel(logLevel)
@@ -71,37 +71,37 @@ def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "IN
     logger.debug("Got " + str(len(rows)) + " rows")
 
     outputTable = []
-    if config != None:
-        configData = json.loads(open(config).read())["fields"]
-        for row in tqdm(rows, total=len(rows),desc="Masking data"):
-            outputRow = {}
-            # print(columns)
-            for columnName,i in columns.items():
-                inputData = row[i]
-                if columnName not in configData.keys(): outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
-                maskData = configData[columnName]
+    # if config != None:
+    configData = json.loads(open(config).read())["fields"]
+    for row in tqdm(rows, total=len(rows),desc="Masking data"):
+        outputRow = {}
+        # print(columns)
+        for columnName,i in columns.items():
+            inputData = row[i]
+            if columnName not in configData.keys(): outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
+            maskData = configData[columnName]
 
-                maskingType = maskData["maskingType"]
-                if maskingType == None: raise ValueError("No Masking type for field: " + fieldName)
+            maskingType = maskData["maskingType"]
+            if maskingType == None: raise ValueError("No Masking type for field: " + fieldName)
 
-                if maskingType == "regex":
-                    pattern = maskData["pattern"]
-                    replacement = maskData["replacement"]
-                    outputData = regex(inputData,pattern,replacement)
-                    outputRow[columnName] = outputData
-                elif maskingType == "redact":
-                    replacement = maskData["replacement"]
-                    outputData = redact(inputData,replacement)
-                    outputRow[columnName] = outputData
-                elif maskingType == "partial":
-                    visiblePrefix = maskData["visiblePrefix"]
-                    visibleSuffix = maskData["visibleSuffix"]
-                    replacement = maskData["replacement"]
-                    outputData = partial(inputData,visiblePrefix,visibleSuffix,replacement)
-                    outputRow[columnName] = outputData
-                else:
-                    raise ValueError("Unsupported Masking Type: " + maskingType)
-            outputTable.append(outputRow)
+            if maskingType == "regex":
+                pattern = maskData["pattern"]
+                replacement = maskData["replacement"]
+                outputData = regex(inputData,pattern,replacement)
+                outputRow[columnName] = outputData
+            elif maskingType == "redact":
+                replacement = maskData["replacement"]
+                outputData = redact(inputData,replacement)
+                outputRow[columnName] = outputData
+            elif maskingType == "partial":
+                visiblePrefix = maskData["visiblePrefix"]
+                visibleSuffix = maskData["visibleSuffix"]
+                replacement = maskData["replacement"]
+                outputData = partial(inputData,visiblePrefix,visibleSuffix,replacement)
+                outputRow[columnName] = outputData
+            else:
+                raise ValueError("Unsupported Masking Type: " + maskingType)
+        outputTable.append(outputRow)
 
 
     outputDBdata = outputDB.split(":")
@@ -157,7 +157,7 @@ def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "IN
 @arguably.command
 def setup(filename: str):
     '''
-    Create a JSON config file 
+    Set the masking type for each field 
 
     Args:
         filename (str): The filename for the file to be created
