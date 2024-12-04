@@ -10,11 +10,13 @@ from partial import partial
 from redact import redact
 from regex import regex
 import logging
+import setupFields
 
 logger = logging.getLogger(__name__)
 
 __version__ = "1.0.0"
 
+# open secrets file and import all client secrets.
 secrets = {}
 with open("secrets") as f:
     for line in f.readlines():
@@ -27,8 +29,8 @@ def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "IN
     Mask the sensitive data in your mySQL or postgreSQL database
 
     Args:
-        inputDB (str): The address of the input database containing potentially sensitive data
-        outputDB (str): The address for the output database where the masked data will be inserted
+        inputDB (str): The address of the input database. Format: host:database:table
+        outputDB (str): The address for the output database. Format: host:database:table
         config (str, optional): [-c] JSON file containing masking options for each field in the tables
         logLevel (str, optional): [-L] Log level for output (e.g., DEBUG, INFO, WARNING) 
     '''
@@ -152,7 +154,28 @@ def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "IN
     if len(fails) > 0:
         logger.error(str(len(fails)) + " rows couldn't be inserted")
                 
+@arguably.command
+def setup(filename: str):
+    '''
+    Create a JSON config file 
 
+    Args:
+        filename (str): The filename for the file to be created
+    '''
+    config = {}
+
+    while True:
+        fieldName = input("Field Name (q to end) =>")
+        if fieldName == "q": break
+        fieldConfig = setupFields.getMaskConfig()
+        config[fieldName] = fieldConfig
+
+    file = {"fields": config}
+    jsonData = json.dumps(file)
+
+
+    with open(filename,"w+") as f:
+        f.write(jsonData)
 
 
 

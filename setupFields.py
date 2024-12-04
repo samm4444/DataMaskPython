@@ -81,21 +81,7 @@ def getMaskConfig() -> dict:
 
   return config
 
-config = {}
 
-while True:
-  fieldName = input("Field Name (q to end) =>")
-  if fieldName == "q": break
-  fieldConfig = getMaskConfig()
-  config[fieldName] = fieldConfig
-
-file = {"fields": config}
-jsonData = json.dumps(file)
-
-filename = input("File Name (.json)=>")
-
-with open(filename + ".json","w+") as f:
-  f.write(jsonData)
 
 
 
