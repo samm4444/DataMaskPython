@@ -11,10 +11,10 @@
       "replacement": "*******"
     },
     "phoneNumber": {
-      "maskingType": "partial",
-      "visiblePrefix": 0,
-      "visibleSuffix": 4,
-      "replacement": "*"
+      "maskingType": "scrambleInt",
+      "min": 0,
+      "max": 9,
+      "length": "None"
     },
     "dob": {
       "maskingType": "regex",

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import requests
-import random
 import arguably
 import mysql.connector
 import json
@@ -10,6 +9,7 @@ from partial import partial
 from redact import redact
 from regex import regex
 import logging
+from scrambleInt import scrambleInt
 import setupFields
 
 logger = logging.getLogger(__name__)
@@ -34,22 +34,37 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         config (str): JSON file containing masking options for each field in the tables. This can be generated using the setup command.
         logLevel (str, optional): [-L] Log level for output (e.g., DEBUG, INFO, WARNING) 
     '''
+    # set up logger to specified log level
     logger.setLevel(logLevel)
     console_handler = logging.StreamHandler()
-    
     formatter = logging.Formatter(
         "{levelname} - {message}",
         style="{"
     )
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
+
+    # read config file
+    try:
+        configData = json.loads(open(config).read())["fields"]
+    except FileNotFoundError:
+        logger.error("Could not find config file: " + config)
+        return
+
     inputDBdata = inputDB.split(":")
-    inputHost = inputDBdata[0]
-    inputDatabase = inputDBdata[1]
-    inputTable = inputDBdata[2]
+    try:
+        inputHost = inputDBdata[0]
+        inputDatabase = inputDBdata[1]
+        inputTable = inputDBdata[2]
+    except IndexError:
+        logger.error("Input database malformed: " + inputDB)
+        return
+    # get username and password input for db
     logger.info("Logging into " + inputHost)
     inputUsername = input("username =>")
     inputPassword = getpass()
+
+    # establish database connection with credentials
     logger.info("Connecting...")
     inputDBconnection = mysql.connector.connect(
     host=inputHost,
@@ -58,55 +73,82 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     database=inputDatabase
     )
     logger.info("Connection Successful")
+
     inputCursor = inputDBconnection.cursor()
     logger.debug("Created input database cursor")
+
     logger.info("Loading data from table: " + inputTable)
+    
+    # get the names of each field and their index within a row
     inputCursor.execute("DESCRIBE "+inputTable+";")
     columns = {}
     for i,column in enumerate(inputCursor.fetchall()):
         columns[column[0]] = i
     logger.debug("Got input database column names: " + str(len(columns.items())) + " columns")
+
+    # get rows of data to be masked
     inputCursor.execute("SELECT * FROM "+inputTable+";")
     rows = inputCursor.fetchall()
     logger.debug("Got " + str(len(rows)) + " rows")
 
     outputTable = []
-    configData = json.loads(open(config).read())["fields"]
+    
+
     for row in tqdm(rows, total=len(rows),desc="Masking data"):
         outputRow = {}
         # print(columns)
         for columnName,i in columns.items():
             inputData = row[i]
             if columnName not in configData.keys(): outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
-            maskData = configData[columnName]
 
-            maskingType = maskData["maskingType"]
+            maskSettings = configData[columnName] # get masking settings for this column
+
+            maskingType = maskSettings["maskingType"]
             if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
 
-            if maskingType == "regex":
-                pattern = maskData["pattern"]
-                replacement = maskData["replacement"]
+            if maskingType == "regex": # Mask data with REGEX
+                pattern = maskSettings["pattern"]
+                replacement = maskSettings["replacement"]
                 outputData = regex(inputData,pattern,replacement)
                 outputRow[columnName] = outputData
-            elif maskingType == "redact":
-                replacement = maskData["replacement"]
+
+            elif maskingType == "redact": # Mask data with Redact
+                replacement = maskSettings["replacement"]
                 outputData = redact(inputData,replacement)
                 outputRow[columnName] = outputData
-            elif maskingType == "partial":
-                visiblePrefix = maskData["visiblePrefix"]
-                visibleSuffix = maskData["visibleSuffix"]
-                replacement = maskData["replacement"]
+
+            elif maskingType == "partial": # Mask data with Partial
+                visiblePrefix = maskSettings["visiblePrefix"]
+                visibleSuffix = maskSettings["visibleSuffix"]
+                replacement = maskSettings["replacement"]
                 outputData = partial(inputData,visiblePrefix,visibleSuffix,replacement)
                 outputRow[columnName] = outputData
-            else:
-                raise ValueError("Unsupported Masking Type: " + maskingType)
+            elif maskingType == "scrambleInt":
+                min = maskSettings["min"]
+                max = maskSettings["max"]
+                length = None
+                if maskSettings["length"].lower() != "none":
+                    length = int(maskSettings["length"])
+                outputData = scrambleInt(inputData,min,max,length)
+                outputRow[columnName] = outputData
+
+            else: # Fail due to unknown masking type in config file
+                logger.error("Unsupported Masking Type: " + maskingType)
+                return
+                        
         outputTable.append(outputRow)
 
 
     outputDBdata = outputDB.split(":")
-    outputHost = outputDBdata[0]
-    outputDatabase = outputDBdata[1]
-    outputTableName = outputDBdata[2]
+    try:
+        outputHost = outputDBdata[0]
+        outputDatabase = outputDBdata[1]
+        outputTableName = outputDBdata[2]
+    except IndexError:
+        logger.error("Output database malformed: " + outputDB)
+        return
+
+    # get username and password input for db if the host is different to the input db
     logger.info("Logging into " + outputHost)
     outputUsername = ""
     outputPassword = ""
@@ -116,6 +158,8 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     else:
         outputUsername = input("username =>")
         outputPassword = getpass()
+
+    # establish database connection with credentials
     logger.info("Connecting...")
     outputDBconnection = mysql.connector.connect(
     host=outputHost,
@@ -124,6 +168,7 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     database=outputDatabase
     )
     logger.info("Connection Successful")
+
     outputCursor = outputDBconnection.cursor()
     fails = []
     for row in tqdm(outputTable,total=len(outputTable),desc="Writing output"):
@@ -178,36 +223,30 @@ def setup(filename: str):
 
 
 
-def scramble(IN: int, MIN: int = 0, MAX: int = 9) -> int:
-    OUT = ""
-    for i in str(IN):
-        OUT += str(random.randint(MIN,MAX))
-    return int(OUT)
+# def address(IN: list) -> dict:
+#     url = "https://my.api.mockaroo.com/address.json"
 
-def address(IN: list) -> dict:
-    url = "https://my.api.mockaroo.com/address.json"
+#     payload = {}
+#     headers = {
+#     'X-API-Key': secrets["mockaroo"]
+#     }
 
-    payload = {}
-    headers = {
-    'X-API-Key': secrets["mockaroo"]
-    }
+#     response = requests.request("GET", url, headers=headers, data=payload)
+#     data = response.text.split(",")
+#     addressData = {}
+#     addressData["streetNumber"] = data[0].strip()
+#     addressData["streetName"] = data[1].strip()
+#     addressData["streetSuffix"] = data[2].strip()
+#     addressData["street"] = addressData["streetName"] + " " + addressData["streetSuffix"]
+#     addressData["streetAddress"] = addressData["streetNumber"] + " " + addressData["street"]
+#     addressData["city"] = data[3].strip()
+#     addressData["country"] = data[4].strip()
+#     addressData["postcode"] = data[5].strip()
 
-    response = requests.request("GET", url, headers=headers, data=payload)
-    data = response.text.split(",")
-    addressData = {}
-    addressData["streetNumber"] = data[0].strip()
-    addressData["streetName"] = data[1].strip()
-    addressData["streetSuffix"] = data[2].strip()
-    addressData["street"] = addressData["streetName"] + " " + addressData["streetSuffix"]
-    addressData["streetAddress"] = addressData["streetNumber"] + " " + addressData["street"]
-    addressData["city"] = data[3].strip()
-    addressData["country"] = data[4].strip()
-    addressData["postcode"] = data[5].strip()
-
-    OUT = {}
-    for i in IN:
-        OUT[i] = addressData[i]
-    return OUT
+#     OUT = {}
+#     for i in IN:
+#         OUT[i] = addressData[i]
+#     return OUT
     
 
 if __name__ == "__main__":

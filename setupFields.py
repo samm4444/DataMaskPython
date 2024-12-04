@@ -44,6 +44,27 @@ masks = [{"id": "redact",
             "displayName": "Regular Expression",
             "description": "The regualar expression pattern to match",
             "type": "str"
+          }]},
+         {"id": "scrambleInt",
+          "displayName":"Scramble Integer",
+          "params": [
+            {
+            "id": "min",
+            "displayName": "Minimum",
+            "description": "The smallest a number in the sequence can be.",
+            "type": "int"
+          },
+          {
+            "id": "max",
+            "displayName": "Maximum",
+            "description": "The largest a number in the sequence can be.",
+            "type": "int"
+          },
+          {
+            "id": "length",
+            "displayName": "Length",
+            "description": "The Length of the masked sequence. Type None to keep the length of the input.",
+            "type": "str"
           }]}]
 
 def getMaskConfig() -> dict:
