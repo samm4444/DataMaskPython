@@ -7,25 +7,19 @@
     },
     "email": {
       "maskingType": "regex",
-      "pattern": "([^@]+)@(.+)",
-      "replacement": "***@***"
+      "pattern": "(?<=^.).*(?=.*@)",
+      "replacement": "*******"
     },
-    "phone": {
+    "phoneNumber": {
       "maskingType": "partial",
-      "visiblePrefix": 3,
-      "visibleSuffix": 2,
-      "replacement": "*"
-    },
-    "creditCard": {
-      "maskingType": "partial",
-      "visiblePrefix": 4,
+      "visiblePrefix": 0,
       "visibleSuffix": 4,
       "replacement": "*"
     },
-    "dateOfBirth": {
+    "dob": {
       "maskingType": "regex",
       "pattern": "[0-9]",
-      "replacement": "*"
+      "replacement": "#"
     }
   }
 }

@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-import re
 import requests
 import random
 import arguably
 import mysql.connector
 import json
+from getpass import getpass
+from tqdm import tqdm
+from partial import partial
+from redact import redact
+from regex import regex
+import logging
+
+logger = logging.getLogger(__name__)
 
 __version__ = "1.0.0"
 
@@ -15,100 +22,139 @@ with open("secrets") as f:
         secrets[ld[0]] = ld[1]
 
 @arguably.command
-def mask(input: str, output: str, config: str = None):
+def mask(inputDB: str, outputDB: str, *, config: str = None, logLevel: str = "INFO"):
     '''
     Mask the sensitive data in your mySQL or postgreSQL database
 
     Args:
-        input: The address of the input database containing potentially sensitive data
-        output: The address for the output database where the masked data will be inserted
-        config: JSON file containing masking options for each field in the tables
+        inputDB (str): The address of the input database containing potentially sensitive data
+        outputDB (str): The address for the output database where the masked data will be inserted
+        config (str, optional): [-c] JSON file containing masking options for each field in the tables
+        logLevel (str, optional): [-L] Log level for output (e.g., DEBUG, INFO, WARNING) 
     '''
-    # mydb = mysql.connector.connect(
-    # host="192.168.1.115",
-    # user="root",
-    # password="h4mster",
-    # port="3306"
-    # )
+    logger.setLevel(logLevel)
+    console_handler = logging.StreamHandler()
+    
+    formatter = logging.Formatter(
+        "{levelname} - {message}",
+        style="{"
+    )
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    inputDBdata = inputDB.split(":")
+    inputHost = inputDBdata[0]
+    inputDatabase = inputDBdata[1]
+    inputTable = inputDBdata[2]
+    logger.info("Logging into " + inputHost)
+    inputUsername = input("username =>")
+    inputPassword = getpass()
+    logger.info("Connecting...")
+    inputDBconnection = mysql.connector.connect(
+    host=inputHost,
+    user=inputUsername,
+    password=inputPassword,
+    database=inputDatabase
+    )
+    logger.info("Connection Successful")
+    inputCursor = inputDBconnection.cursor()
+    logger.debug("Created input database cursor")
+    logger.info("Loading data from table: " + inputTable)
+    inputCursor.execute("DESCRIBE "+inputTable+";")
+    columns = {}
+    for i,column in enumerate(inputCursor.fetchall()):
+        columns[column[0]] = i
+    logger.debug("Got input database column names: " + str(len(columns.items())) + " columns")
+    inputCursor.execute("SELECT * FROM "+inputTable+";")
+    rows = inputCursor.fetchall()
+    logger.debug("Got " + str(len(rows)) + " rows")
+
+    outputTable = []
     if config != None:
-        data = json.loads(open(config).read())
-        for field, fieldData in data["fields"].items():
-            print(field,end="\n -- ")
-            maskingType = fieldData["maskingType"]
-            if maskingType == None: raise ValueError("No Masking type for field: " + field)
+        configData = json.loads(open(config).read())["fields"]
+        for row in tqdm(rows, total=len(rows),desc="Masking data"):
+            outputRow = {}
+            # print(columns)
+            for columnName,i in columns.items():
+                inputData = row[i]
+                if columnName not in configData.keys(): outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
+                maskData = configData[columnName]
 
-            if maskingType == "regex":
-                pattern = fieldData["pattern"]
-                replacement = fieldData["replacement"]
-                print(regex("sam@mail.com",pattern,replacement))
-            elif maskingType == "redact":
-                replacement = fieldData["replacement"]
-                print(redact("password",replacement))
-            elif maskingType == "partial":
-                visiblePrefix = fieldData["visiblePrefix"]
-                visibleSuffix = fieldData["visibleSuffix"]
-                replacement = fieldData["replacement"]
-                print(partial("sam@mail.com",visiblePrefix,visibleSuffix,replacement))
+                maskingType = maskData["maskingType"]
+                if maskingType == None: raise ValueError("No Masking type for field: " + fieldName)
+
+                if maskingType == "regex":
+                    pattern = maskData["pattern"]
+                    replacement = maskData["replacement"]
+                    outputData = regex(inputData,pattern,replacement)
+                    outputRow[columnName] = outputData
+                elif maskingType == "redact":
+                    replacement = maskData["replacement"]
+                    outputData = redact(inputData,replacement)
+                    outputRow[columnName] = outputData
+                elif maskingType == "partial":
+                    visiblePrefix = maskData["visiblePrefix"]
+                    visibleSuffix = maskData["visibleSuffix"]
+                    replacement = maskData["replacement"]
+                    outputData = partial(inputData,visiblePrefix,visibleSuffix,replacement)
+                    outputRow[columnName] = outputData
+                else:
+                    raise ValueError("Unsupported Masking Type: " + maskingType)
+            outputTable.append(outputRow)
+
+
+    outputDBdata = outputDB.split(":")
+    outputHost = outputDBdata[0]
+    outputDatabase = outputDBdata[1]
+    outputTableName = outputDBdata[2]
+    logger.info("Logging into " + outputHost)
+    outputUsername = ""
+    outputPassword = ""
+    if outputHost == inputHost:
+        outputUsername = inputUsername
+        outputPassword = inputPassword
+    else:
+        outputUsername = input("username =>")
+        outputPassword = getpass()
+    logger.info("Connecting...")
+    outputDBconnection = mysql.connector.connect(
+    host=outputHost,
+    user=outputUsername,
+    password=outputPassword,
+    database=outputDatabase
+    )
+    logger.info("Connection Successful")
+    outputCursor = outputDBconnection.cursor()
+    fails = []
+    for row in tqdm(outputTable,total=len(outputTable),desc="Writing output"):
+        outputColumns = "("
+        outputValues = "("
+        first = True
+        for columnName,columnValue in row.items():
+            if columnValue == None: continue;
+            if not first: 
+                outputColumns += ',' + columnName
+                outputValues += ',"' + str(columnValue) + '"'
+                continue
             else:
-                raise ValueError("Unsupported Masking Type: " + maskingType)
+                outputColumns += columnName
+                outputValues += '"' + str(columnValue) + '"'
+                first = False
+        outputColumns += ")"
+        outputValues += ")"
+
+        try:
+            outputCursor.execute("INSERT INTO " + outputTableName + " " + outputColumns + " VALUES " + outputValues)
+            
+            outputDBconnection.commit()
+        except mysql.connector.errors.IntegrityError:
+            fails.append(row)
+
+    if len(fails) > 0:
+        logger.error(str(len(fails)) + " rows couldn't be inserted")
+                
 
 
 
-
-def regex(IN: str, pattern: str, replacement: str) -> str:
-    '''
-    Matches with a REGEX pattern and replaces the matching portion with a specific string
-
-    Args:
-        IN (str): Input string to be masked
-        pattern (str): REGEX pattern to match part to be replaced
-        replacement (str): text to replace match with
-
-    Returns:
-        str: The masked string
-    '''
-    if pattern == None: raise ValueError("No Pattern to match")
-    return re.sub(pattern,replacement,IN)
-
-
-
-
-def partial(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
-    '''
-    Replaces a portion of a string with a specific character 
-
-    Args:
-        IN (str): Input string to be masked
-        visiblePrefix (int): Number of characters, at the start, to be visable
-        visibleSuffix (int): Number of characters, at the end, to be visable
-        maskingChar (str): Character to replace the non-visable characters with
-
-    Returns:
-        str: The masked string
-    '''
-    OUT = IN
-    for i in range(visiblePrefix,len(IN) - visibleSuffix):
-        OUT = OUT[:i] + maskingChar + OUT[i +1:]
-    return OUT
-
-
-
-
-def redact(IN: str, CHAR: str) -> str:
-    '''
-    Replaces all characters of a string with a specific character
-
-    Args:
-        IN (str): Input string to be masked
-        maskingChar (str): Character to replace the characters with
-
-    Returns:
-        str: The masked string
-    '''
-    OUT = ""
-    for i in IN:
-        OUT += CHAR
-    return OUT
 
 def scramble(IN: int, MIN: int = 0, MAX: int = 9) -> int:
     OUT = ""
@@ -143,5 +189,6 @@ def address(IN: list) -> dict:
     
 
 if __name__ == "__main__":
+    
     arguably.run()
 
