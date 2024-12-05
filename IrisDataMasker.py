@@ -64,14 +64,18 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     inputDBUsername = input("username =>")
     inputDBPassword = getpass()
 
-    # establish database connection with credentials
-    logger.info("Connecting...")
-    inputDBconnection = mysql.connector.connect(
-    host=inputDBHost,
-    user=inputDBUsername,
-    password=inputDBPassword,
-    database=inputDatabaseName
-    )
+    try:
+        # establish database connection with credentials
+        logger.info("Connecting...")
+        inputDBconnection = mysql.connector.connect(
+        host=inputDBHost,
+        user=inputDBUsername,
+        password=inputDBPassword,
+        database=inputDatabaseName
+        )
+    except mysql.connector.errors.ProgrammingError:
+        logger.error("Failed to connect to database")
+        return
     logger.info("Connection Successful")
 
     inputDBCursor = inputDBconnection.cursor()
@@ -159,14 +163,18 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         outputDBUsername = input("username =>")
         outputDBPassword = getpass()
 
-    # establish database connection with credentials
-    logger.info("Connecting...")
-    outputDBconnection = mysql.connector.connect(
-    host=outputDBHost,
-    user=outputDBUsername,
-    password=outputDBPassword,
-    database=outputDatabaseName
-    )
+    try:
+        # establish database connection with credentials
+        logger.info("Connecting...")
+        outputDBconnection = mysql.connector.connect(
+        host=outputDBHost,
+        user=outputDBUsername,
+        password=outputDBPassword,
+        database=outputDatabaseName
+        )
+    except mysql.connector.errors.ProgrammingError:
+        logger.error("Failed to connect to database")
+        return
     logger.info("Connection Successful")
 
     outputDBCursor = outputDBconnection.cursor()
@@ -241,15 +249,18 @@ def clean(database: str):
     logger.info("Logging into " + DBHost)
     DBUsername = input("username =>")
     DBPassword = getpass()
-
+    try:
     # establish database connection with credentials
-    logger.info("Connecting...")
-    DBconnection = mysql.connector.connect(
-    host=DBHost,
-    user=DBUsername,
-    password=DBPassword,
-    database=DatabaseName
-    )
+        logger.info("Connecting...")
+        DBconnection = mysql.connector.connect(
+        host=DBHost,
+        user=DBUsername,
+        password=DBPassword,
+        database=DatabaseName
+        )
+    except mysql.connector.errors.ProgrammingError:
+        logger.error("Failed to connect to database")
+        return
     logger.info("Connection Successful")
 
     DBCursor = DBconnection.cursor()
