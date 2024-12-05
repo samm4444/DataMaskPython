@@ -260,7 +260,7 @@ def clean(database: str):
     print("Are you sure you want to remove all records from " + DatabaseName + " - " + DBTable + "? Type YES to confirm.")
     confirmation = input()
     if confirmation == "YES":
-        DBCursor.execute("REMOVE FROM "+DBTable+";")
+        DBCursor.execute("DELETE FROM "+DBTable+";")
         DBconnection.commit()
 
 
