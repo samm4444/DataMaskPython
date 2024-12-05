@@ -53,48 +53,48 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     inputDBdata = inputDB.split(":")
     try:
-        inputHost = inputDBdata[0]
-        inputDatabase = inputDBdata[1]
-        inputTable = inputDBdata[2]
+        inputDBHost = inputDBdata[0]
+        inputDatabaseName = inputDBdata[1]
+        inputDBTable = inputDBdata[2]
     except IndexError:
         logger.error("Input database malformed: " + inputDB)
         return
     # get username and password input for db
-    logger.info("Logging into " + inputHost)
-    inputUsername = input("username =>")
-    inputPassword = getpass()
+    logger.info("Logging into " + inputDBHost)
+    inputDBUsername = input("username =>")
+    inputDBPassword = getpass()
 
     # establish database connection with credentials
     logger.info("Connecting...")
     inputDBconnection = mysql.connector.connect(
-    host=inputHost,
-    user=inputUsername,
-    password=inputPassword,
-    database=inputDatabase
+    host=inputDBHost,
+    user=inputDBUsername,
+    password=inputDBPassword,
+    database=inputDatabaseName
     )
     logger.info("Connection Successful")
 
-    inputCursor = inputDBconnection.cursor()
+    inputDBCursor = inputDBconnection.cursor()
     logger.debug("Created input database cursor")
 
-    logger.info("Loading data from table: " + inputTable)
+    logger.info("Loading data from table: " + inputDBTable)
     
     # get the names of each field and their index within a row
-    inputCursor.execute("DESCRIBE "+inputTable+";")
+    inputDBCursor.execute("DESCRIBE "+inputDBTable+";")
     columns = {}
-    for i,column in enumerate(inputCursor.fetchall()):
+    for i,column in enumerate(inputDBCursor.fetchall()):
         columns[column[0]] = i
     logger.debug("Got input database column names: " + str(len(columns.items())) + " columns")
 
     # get rows of data to be masked
-    inputCursor.execute("SELECT * FROM "+inputTable+";")
-    rows = inputCursor.fetchall()
-    logger.debug("Got " + str(len(rows)) + " rows")
+    inputDBCursor.execute("SELECT * FROM "+inputDBTable+";")
+    inputDBRows = inputDBCursor.fetchall()
+    logger.debug("Got " + str(len(inputDBRows)) + " rows")
 
     outputTable = []
     
 
-    for row in tqdm(rows, total=len(rows),desc="Masking data"):
+    for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking data"):
         outputRow = {}
         # print(columns)
         for columnName,i in columns.items():
@@ -141,36 +141,36 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     outputDBdata = outputDB.split(":")
     try:
-        outputHost = outputDBdata[0]
-        outputDatabase = outputDBdata[1]
-        outputTableName = outputDBdata[2]
+        outputDBHost = outputDBdata[0]
+        outputDatabaseName = outputDBdata[1]
+        outputDBTable = outputDBdata[2]
     except IndexError:
         logger.error("Output database malformed: " + outputDB)
         return
 
     # get username and password input for db if the host is different to the input db
-    logger.info("Logging into " + outputHost)
-    outputUsername = ""
-    outputPassword = ""
-    if outputHost == inputHost:
-        outputUsername = inputUsername
-        outputPassword = inputPassword
+    logger.info("Logging into " + outputDBHost)
+    outputDBUsername = ""
+    outputDBPassword = ""
+    if outputDBHost == inputDBHost:
+        outputDBUsername = inputDBUsername
+        outputDBPassword = inputDBPassword
     else:
-        outputUsername = input("username =>")
-        outputPassword = getpass()
+        outputDBUsername = input("username =>")
+        outputDBPassword = getpass()
 
     # establish database connection with credentials
     logger.info("Connecting...")
     outputDBconnection = mysql.connector.connect(
-    host=outputHost,
-    user=outputUsername,
-    password=outputPassword,
-    database=outputDatabase
+    host=outputDBHost,
+    user=outputDBUsername,
+    password=outputDBPassword,
+    database=outputDatabaseName
     )
     logger.info("Connection Successful")
 
-    outputCursor = outputDBconnection.cursor()
-    fails = []
+    outputDBCursor = outputDBconnection.cursor()
+    insertFails = []
     for row in tqdm(outputTable,total=len(outputTable),desc="Writing output"):
         outputColumns = "("
         outputValues = "("
@@ -189,14 +189,14 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         outputValues += ")"
 
         try:
-            outputCursor.execute("INSERT INTO " + outputTableName + " " + outputColumns + " VALUES " + outputValues)
+            outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputValues)
             
             outputDBconnection.commit()
         except mysql.connector.errors.IntegrityError:
-            fails.append(row)
+            insertFails.append({"row": row, "error": "IntegrityError"})
 
-    if len(fails) > 0:
-        logger.error(str(len(fails)) + " rows couldn't be inserted")
+    if len(insertFails) > 0:
+        logger.error(str(len(insertFails)) + " rows couldn't be inserted")
                 
 @arguably.command
 def setup(filename: str):
