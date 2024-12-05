@@ -262,6 +262,9 @@ def clean(database: str):
     if confirmation == "YES":
         DBCursor.execute("DELETE FROM "+DBTable+";")
         DBconnection.commit()
+        print(str(DBCursor.rowcount) + " rows removed!")
+    else:
+        print("Stopping without removing any rows!")
 
 
 
