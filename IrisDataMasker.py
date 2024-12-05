@@ -18,7 +18,7 @@ __version__ = "1.0.0"
 
 # open secrets file and import all client secrets.
 secrets = {}
-with open("secrets") as f:
+with open("secrets", "w+") as f:
     for line in f.readlines():
         ld = line.split("=")
         secrets[ld[0]] = ld[1]

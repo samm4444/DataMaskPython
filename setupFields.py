@@ -2,6 +2,7 @@ import json
 
 masks = [{"id": "redact",
           "displayName":"Redact",
+          "description": "Replace every character in the input with another for e.g: #",
           "params": [
             {
             "id": "replacement",
@@ -11,6 +12,7 @@ masks = [{"id": "redact",
           }]},
          {"id": "partial",
           "displayName":"Partial",
+          "description": "Replace charcters with another, optionally leaving some characters visable at the start and/or end of the input.",
           "params": [
             {
             "id": "replacement",
@@ -32,6 +34,7 @@ masks = [{"id": "redact",
           }]},
          {"id": "regex",
           "displayName":"Regular Expression",
+          "description": "Replace the parts that match a REGEX with something else.",
           "params": [
             {
             "id": "replacement",
@@ -47,6 +50,7 @@ masks = [{"id": "redact",
           }]},
          {"id": "scrambleInt",
           "displayName":"Scramble Integer",
+          "description": "Replace numbers in a sequence with random numbers. E.g. 073892564321 -> 88644284274",
           "params": [
             {
             "id": "min",
