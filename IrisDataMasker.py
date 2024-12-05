@@ -220,6 +220,49 @@ def setup(filename: str):
 
     with open(filename,"w+") as f:
         f.write(jsonData)
+@arguably.command
+def clean(database: str):
+    '''
+    Remove all the records from the table 
+
+    Args:
+        database (str): The address of the input database. Format: host:database:table
+    '''
+
+    DBdata = database.split(":")
+    try:
+        DBHost = DBdata[0]
+        DatabaseName = DBdata[1]
+        DBTable = DBdata[2]
+    except IndexError:
+        logger.error("Input database malformed: " + database)
+        return
+    # get username and password input for db
+    logger.info("Logging into " + DBHost)
+    DBUsername = input("username =>")
+    DBPassword = getpass()
+
+    # establish database connection with credentials
+    logger.info("Connecting...")
+    DBconnection = mysql.connector.connect(
+    host=DBHost,
+    user=DBUsername,
+    password=DBPassword,
+    database=DatabaseName
+    )
+    logger.info("Connection Successful")
+
+    DBCursor = DBconnection.cursor()
+    logger.debug("Created input database cursor")
+
+    logger.info("Loading data from table: " + DBTable)
+    
+    print("Are you sure you want to remove all records from " + DatabaseName + " - " + DBTable + "? Type YES to confirm.")
+    confirmation = input()
+    if confirmation == "YES":
+        DBCursor.execute("REMOVE FROM "+DBTable+";")
+        DBconnection.commit()
+
 
 
 
