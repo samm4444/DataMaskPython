@@ -1,1 +1,25 @@
-Usage:
+# IrisDataMasker
+
+Mask specific fields from a mySQL database table and export to a seperate database/table.
+
+
+
+
+## Usage
+
+__Create a config JSON to specify which fields to mask and how:__
+```bash
+    IrisDataMasker.py setup [filename]
+```
+
+__Mask a table using the config file:__
+
+*Input and output databases must be in the folowing format:*
+```
+    [hostname]:[database]:[table]
+```
+
+Run the command:
+```bash
+    IrisDataMasker.py mask [inputDB] [outputDB] [configfile] 
+```
