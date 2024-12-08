@@ -5,12 +5,10 @@ import mysql.connector
 import json
 from getpass import getpass
 from tqdm import tqdm
-from partial import partial
-from redact import redact
-from regex import regex
 import logging
-from scrambleInt import scrambleInt
-import setupFields
+import json
+import re
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +195,11 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     if len(fails) > 0:
         logger.error(str(len(fails)) + " rows couldn't be inserted")
-                
+
+
+### JSON CONFIG SETUP
+
+
 @arguably.command
 def setup(filename: str):
     '''
@@ -221,7 +223,187 @@ def setup(filename: str):
     with open(filename,"w+") as f:
         f.write(jsonData)
 
+masks = [{"id": "redact",
+          "displayName":"Redact",
+          "params": [
+            {
+            "id": "replacement",
+            "displayName": "Replacement",
+            "description": "The replacement character",
+            "type": "str"
+          }]},
+         {"id": "partial",
+          "displayName":"Partial",
+          "params": [
+            {
+            "id": "replacement",
+            "displayName": "Replacement",
+            "description": "The replacement character",
+            "type": "str"
+          },
+          {
+            "id": "visiblePrefix",
+            "displayName": "Visible Prefix",
+            "description": "The Number of visible characters at the start of the text",
+            "type": "int"
+          },
+          {
+            "id": "visibleSuffix",
+            "displayName": "Visible Suffix",
+            "description": "The Number of visible characters at the end of the text",
+            "type": "int"
+          }]},
+         {"id": "regex",
+          "displayName":"Regular Expression",
+          "params": [
+            {
+            "id": "replacement",
+            "displayName": "Replacement",
+            "description": "The replacement character",
+            "type": "str"
+          },
+          {
+            "id": "pattern",
+            "displayName": "Regular Expression",
+            "description": "The regualar expression pattern to match",
+            "type": "str"
+          }]},
+         {"id": "scrambleInt",
+          "displayName":"Scramble Integer",
+          "params": [
+            {
+            "id": "min",
+            "displayName": "Minimum",
+            "description": "The smallest a number in the sequence can be.",
+            "type": "int"
+          },
+          {
+            "id": "max",
+            "displayName": "Maximum",
+            "description": "The largest a number in the sequence can be.",
+            "type": "int"
+          },
+          {
+            "id": "length",
+            "displayName": "Length",
+            "description": "The Length of the masked sequence. Type None to keep the length of the input.",
+            "type": "str"
+          }]}]
 
+def getMaskConfig() -> dict:
+  config = {}
+  print("Select Mask Type")
+  for i,mask in enumerate(masks):
+    print(str(i+1) + ". " + mask["displayName"])
+  
+  while True:
+    try:
+      maskID = int(input("=>"))
+      mask = masks[maskID-1]
+      break
+    except TypeError and KeyError:
+      continue
+  config["maskingType"] = mask["id"]
+  for param in mask["params"]:
+    paramId = param["id"]
+    paramDisplayName = param["displayName"]
+    paramDescription = param["description"]
+    paramType = param["type"]
+
+    print(paramDisplayName)
+    print(paramDescription)
+    if paramType == "str":
+      paramValue = input("=>")
+      config[paramId] = paramValue
+    elif paramType == "int":
+      try:
+        paramValue = int(input("=>"))
+        config[paramId] = paramValue
+      except TypeError:
+        print("Enter a number")
+  return config
+
+
+### REDACT FUNCTIONS
+
+
+def partial(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
+    '''
+    Replaces a portion of a string with a specific character 
+
+    Args:
+        IN (str): Input string to be masked
+        visiblePrefix (int): Number of characters, at the start, to be visable
+        visibleSuffix (int): Number of characters, at the end, to be visable
+        maskingChar (str): Character to replace the non-visable characters with
+
+    Returns:
+        str: The masked string
+    '''
+    if IN == None: return None
+    OUT = IN
+    for i in range(visiblePrefix,len(IN) - visibleSuffix):
+        OUT = OUT[:i] + maskingChar + OUT[i +1:]
+    return OUT
+
+
+def redact(IN: str, CHAR: str) -> str:
+    '''
+    Replaces all characters of a string with a specific character
+
+    Args:
+        IN (str): Input string to be masked
+        maskingChar (str): Character to replace the characters with
+
+    Returns:
+        str: The masked string
+    '''
+    if IN == None: return None
+    OUT = ""
+    for i in IN:
+        OUT += CHAR
+    return OUT
+
+
+def regex(IN: str, pattern: str, replacement: str) -> str:
+    '''
+    Matches with a REGEX pattern and replaces the matching portion with a specific string
+
+    Args:
+        IN (str): Input string to be masked
+        pattern (str): REGEX pattern to match part to be replaced
+        replacement (str): text to replace match with
+
+    Returns:
+        str: The masked string
+    '''
+    if IN == None: return None
+    if pattern == None: raise ValueError("No Pattern to match")
+    return re.sub(pattern,replacement,IN)
+
+
+
+def scrambleInt(IN: str, MIN: int = 0, MAX: int = 9, length: int = None) -> str:
+    """
+    Generates a random sequence of numbers
+
+    Args:
+        IN (str): Input string to be masked 
+        MIN (int, optional): The smallest a number in the sequence can be. Defaults to 0.
+        MAX (int, optional): The largest a number in the sequence can be. Defaults to 9.
+        length (int, optional): The length of the output sequence. If not specified it will default to the length of the input.
+
+    Returns:
+        str: The output sequence
+    """
+    OUT = ""
+    if length != None:
+        for _ in range(length):
+            OUT += str(random.randint(MIN,MAX))
+    else:
+        for i in str(IN):
+            OUT += str(random.randint(MIN,MAX))
+    return OUT
 
 # def address(IN: list) -> dict:
 #     url = "https://my.api.mockaroo.com/address.json"
