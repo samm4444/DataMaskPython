@@ -224,7 +224,7 @@ def postgreSQL(host:str, db: str, user: str, password: str):
 
     cursor = connection.cursor()
 
-    cursor.execute("SELECT * from user;")
+    cursor.execute("SELECT * FROM userSensitive;")
 
     # Fetch all rows from database
     record = cursor.fetchall()
