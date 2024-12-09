@@ -93,53 +93,13 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     inputDBRows = inputDBCursor.fetchall()
     logger.debug("Got " + str(len(inputDBRows)) + " rows")
 
-    outputTable = []
-    
 
-    for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking data"):
-        outputRow = {}
-        # print(columns)
-        for columnName,i in columns.items():
-            inputData = row[i]
-            if columnName not in configData.keys(): outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
-
-            maskSettings = configData[columnName] # get masking settings for this column
-
-            maskingType = maskSettings["maskingType"]
-            if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
-
-            if maskingType == "regex": # Mask data with REGEX
-                pattern = maskSettings["pattern"]
-                replacement = maskSettings["replacement"]
-                outputData = regex(inputData,pattern,replacement)
-                outputRow[columnName] = outputData
-
-            elif maskingType == "redact": # Mask data with Redact
-                replacement = maskSettings["replacement"]
-                outputData = redact(inputData,replacement)
-                outputRow[columnName] = outputData
-
-            elif maskingType == "partial": # Mask data with Partial
-                visiblePrefix = maskSettings["visiblePrefix"]
-                visibleSuffix = maskSettings["visibleSuffix"]
-                replacement = maskSettings["replacement"]
-                outputData = partial(inputData,visiblePrefix,visibleSuffix,replacement)
-                outputRow[columnName] = outputData
-            elif maskingType == "scrambleInt":
-                min = maskSettings["min"]
-                max = maskSettings["max"]
-                length = None
-                if maskSettings["length"].lower() != "none":
-                    length = int(maskSettings["length"])
-                outputData = scrambleInt(inputData,min,max,length)
-                outputRow[columnName] = outputData
-
-            else: # Fail due to unknown masking type in config file
-                logger.error("Unsupported Masking Type: " + maskingType)
-                return
-                        
-        outputTable.append(outputRow)
-
+    # create SQL style names of columns for INSERT statement
+    outputColumns = "("
+    for columnName,i in columns.items():
+        outputColumns += columnName + ","
+    outputColumns = outputColumns[:-1]
+    outputColumns += ")"
 
     outputDBdata = outputDB.split(":")
     try:
@@ -176,30 +136,62 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     logger.info("Connection Successful")
 
     outputDBCursor = outputDBconnection.cursor()
-    insertFails = []
-    for row in tqdm(outputTable,total=len(outputTable),desc="Writing output"):
-        outputColumns = "("
-        outputValues = "("
-        first = True
-        for columnName,columnValue in row.items():
-            if columnValue == None: continue;
-            if not first: 
-                outputColumns += ',' + columnName
-                outputValues += ',"' + str(columnValue) + '"'
-                continue
-            else:
-                outputColumns += columnName
-                outputValues += '"' + str(columnValue) + '"'
-                first = False
-        outputColumns += ")"
-        outputValues += ")"
 
-        try:
-            outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputValues)
-            
-            outputDBconnection.commit()
-        except mysql.connector.errors.IntegrityError:
-            insertFails.append({"row": row, "error": "IntegrityError"})
+
+
+
+    
+    outputValuesSTR = ""
+    for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking"):
+
+        outputRowSTR = "("
+        # print(columns)
+        firstColumn = True
+        for columnName,i in columns.items():
+            if firstColumn:
+                firstColumn = False
+            else:
+                outputRowSTR += ","
+            inputData = row[i]
+            if columnName not in configData.keys(): outputRowSTR += '"'+str(inputData)+'"'; continue; # outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
+
+            maskSettings = configData[columnName] # get masking settings for this column
+
+            maskingType = maskSettings["maskingType"]
+            if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
+
+            if maskingType == "regex": # Mask data with REGEX
+                outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
+                outputRowSTR += '"'+str(outputData)+'"'
+
+            elif maskingType == "redact": # Mask data with Redact
+                outputData = redact(inputData,maskSettings["replacement"])
+                outputRowSTR += '"'+str(outputData)+'"'
+
+            elif maskingType == "partial": # Mask data with Partial
+                outputData = partial(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
+                outputRowSTR += '"'+str(outputData)+'"'
+
+            elif maskingType == "scrambleInt":
+                length = None
+                if maskSettings["length"].lower() != "none":
+                    length = int(maskSettings["length"])
+                outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
+                outputRowSTR += '"'+str(outputData)+'"'
+
+            else: # Fail due to unknown masking type in config file
+                logger.error("Unsupported Masking Type: " + maskingType)
+                return
+        outputRowSTR += ")"    
+
+        outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
+
+    insertFails = []
+
+    try:        
+        outputDBconnection.commit()
+    except mysql.connector.errors.IntegrityError:
+        insertFails.append({"row": row, "error": "IntegrityError"})
 
     if len(insertFails) > 0:
         logger.error(str(len(insertFails)) + " rows couldn't be inserted")
