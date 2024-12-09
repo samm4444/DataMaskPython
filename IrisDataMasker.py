@@ -12,7 +12,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # open secrets file and import all client secrets.
 secrets = {}
@@ -203,6 +203,33 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     if len(insertFails) > 0:
         logger.error(str(len(insertFails)) + " rows couldn't be inserted")
+
+
+### POSTGRESQL TEST
+
+@arguably.command
+def postgreSQL(host:str, db: str, user: str, password: str):
+    '''
+    postresql test 
+
+    Args:
+        host (str): host
+        db (str): db
+        user (str): user
+        password (str): pass
+    '''
+    import psycopg2
+
+    connection = psycopg2.connect(database=db, user=user, password=password, host=host)
+
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT * from user;")
+
+    # Fetch all rows from database
+    record = cursor.fetchall()
+
+    print("Data from Database:- ", record)
 
 
 ### JSON CONFIG SETUP
