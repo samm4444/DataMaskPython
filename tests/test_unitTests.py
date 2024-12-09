@@ -7,7 +7,7 @@ class MaskersTest(unittest.TestCase):
     self.assertEqual("******",IrisDataMasker.redact("hello!","*"))
 
   def testPartial(self):
-    self.assertEqual("123****890",IrisDataMasker.partial("1234567890",3,3,"*"))
+    self.assertEqual("123****890",IrisDataMasker.partialRedact("1234567890",3,3,"*"))
 
   def testRegexStar(self):
     self.assertEqual("**/**/****",IrisDataMasker.regex("01/01/2000","[0-9]","*"))

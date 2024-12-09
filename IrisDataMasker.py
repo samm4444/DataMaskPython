@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import multiprocessing.pool
 import requests
 import arguably
 import mysql.connector
@@ -9,6 +10,8 @@ import logging
 import json
 import re
 import random
+import multiprocessing
+from functools import partial
 
 logger = logging.getLogger(__name__)
 
@@ -138,53 +141,54 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     outputDBCursor = outputDBconnection.cursor()
 
 
-
-
+    pool = multiprocessing.Pool()
+    partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
+    results = pool.map(partialMaskRow, inputDBRows)
+    for stmt in tqdm(results, desc="Executing"):
+        outputDBCursor.execute(stmt)
+    pool.close()
     
-    outputValuesSTR = ""
-    for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking"):
 
-        outputRowSTR = "("
-        # print(columns)
-        firstColumn = True
-        for columnName,i in columns.items():
-            if firstColumn:
-                firstColumn = False
-            else:
-                outputRowSTR += ","
-            inputData = row[i]
-            if columnName not in configData.keys(): outputRowSTR += '"'+str(inputData)+'"'; continue; # outputRow[columnName] = inputData; continue; # ignore fields not specified for masking
 
-            maskSettings = configData[columnName] # get masking settings for this column
+    # for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking"):
+    #     # print(columns)
+    #     outputValues = []
+    #     for columnName,i in columns.items():
+    #         inputData = row[i]
 
-            maskingType = maskSettings["maskingType"]
-            if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
+    #         if columnName not in configData.keys(): outputValues.append("".join(['"',str(inputData),'"'])); continue; # ignore fields not specified for masking
 
-            if maskingType == "regex": # Mask data with REGEX
-                outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
-                outputRowSTR += '"'+str(outputData)+'"'
+    #         maskSettings = configData[columnName] # get masking settings for this column
 
-            elif maskingType == "redact": # Mask data with Redact
-                outputData = redact(inputData,maskSettings["replacement"])
-                outputRowSTR += '"'+str(outputData)+'"'
+    #         maskingType = maskSettings["maskingType"]
+    #         if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
 
-            elif maskingType == "partial": # Mask data with Partial
-                outputData = partial(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
-                outputRowSTR += '"'+str(outputData)+'"'
+    #         if maskingType == "regex": # Mask data with REGEX
+    #             outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
+    #             outputValues.append("".join(['"',str(outputData),'"']))
+    #             continue
+    #         elif maskingType == "redact": # Mask data with Redact
+    #             outputData = redact(inputData,maskSettings["replacement"])
+    #             outputValues.append("".join(['"',str(outputData),'"']))
+    #             continue
+    #         elif maskingType == "partial": # Mask data with Partial Redact
+    #             outputData = partialRedact(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
+    #             outputValues.append("".join(['"',str(outputData),'"']))
+    #             continue
+    #         elif maskingType == "scrambleInt":
+    #             length = None
+    #             if maskSettings["length"].lower() != "none":
+    #                 length = int(maskSettings["length"])
+    #             outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
+    #             outputValues.append("".join(['"',str(outputData),'"']))
+    #             continue
+    #         else: # Fail due to unknown masking type in config file
+    #             logger.error("Unsupported Masking Type: " + maskingType)
+    #             return
+        
+    #     outputRowSTR = "".join(["(",','.join(outputValues),")"])
 
-            elif maskingType == "scrambleInt":
-                length = None
-                if maskSettings["length"].lower() != "none":
-                    length = int(maskSettings["length"])
-                outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
-                outputRowSTR += '"'+str(outputData)+'"'
-
-            else: # Fail due to unknown masking type in config file
-                logger.error("Unsupported Masking Type: " + maskingType)
-                return
-        outputRowSTR += ")"    
-
-        outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
+    #     outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
 
     insertFails = []
 
@@ -195,6 +199,47 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     if len(insertFails) > 0:
         logger.error(str(len(insertFails)) + " rows couldn't be inserted")
+
+
+def maskRow(row, columns, configData, outputDBTable, outputColumns):
+    # print(columns)
+    outputValues = []
+    for columnName,i in columns.items():
+        inputData = row[i]
+
+        if columnName not in configData.keys(): outputValues.append("".join(['"',str(inputData),'"'])); continue; # ignore fields not specified for masking
+
+        maskSettings = configData[columnName] # get masking settings for this column
+
+        maskingType = maskSettings["maskingType"]
+        if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
+
+        if maskingType == "regex": # Mask data with REGEX
+            outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
+            outputValues.append("".join(['"',str(outputData),'"']))
+            continue
+        elif maskingType == "redact": # Mask data with Redact
+            outputData = redact(inputData,maskSettings["replacement"])
+            outputValues.append("".join(['"',str(outputData),'"']))
+            continue
+        elif maskingType == "partial": # Mask data with Partial Redact
+            outputData = partialRedact(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
+            outputValues.append("".join(['"',str(outputData),'"']))
+            continue
+        elif maskingType == "scrambleInt":
+            length = None
+            if maskSettings["length"].lower() != "none":
+                length = int(maskSettings["length"])
+            outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
+            outputValues.append("".join(['"',str(outputData),'"']))
+            continue
+        else: # Fail due to unknown masking type in config file
+            logger.error("Unsupported Masking Type: " + maskingType)
+            return
+    
+    outputRowSTR = "".join(["(",','.join(outputValues),")"])
+
+    return "".join(["INSERT INTO ",outputDBTable," ",outputColumns," VALUES ",outputRowSTR,";"])    
 
 
 ### POSTGRESQL TEST
@@ -406,7 +451,7 @@ def getMaskConfig() -> dict:
 ### REDACT FUNCTIONS
 
 
-def partial(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
+def partialRedact(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
     '''
     Replaces a portion of a string with a specific character 
 
@@ -422,7 +467,7 @@ def partial(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
     if IN == None: return None
     OUT = IN
     for i in range(visiblePrefix,len(IN) - visibleSuffix):
-        OUT = OUT[:i] + maskingChar + OUT[i +1:]
+        OUT = "".join([OUT[:i],maskingChar,OUT[i +1:]])
     return OUT
 
 
@@ -438,10 +483,7 @@ def redact(IN: str, CHAR: str) -> str:
         str: The masked string
     '''
     if IN == None: return None
-    OUT = ""
-    for i in IN:
-        OUT += CHAR
-    return OUT
+    return CHAR * len(IN)
 
 
 def regex(IN: str, pattern: str, replacement: str) -> str:
@@ -475,14 +517,17 @@ def scrambleInt(IN: str, MIN: int = 0, MAX: int = 9, length: int = None) -> str:
     Returns:
         str: The output sequence
     """
-    OUT = ""
+    # OUT = ""
+    # outNums = []
     if length != None:
-        for _ in range(length):
-            OUT += str(random.randint(MIN,MAX))
+        return ''.join(str(random.randint(0, 9)) for _ in range(length))
+        # for _ in range(length):
+        #     outNums.append(str(random.randint(MIN,MAX)))
     else:
-        for i in str(IN):
-            OUT += str(random.randint(MIN,MAX))
-    return OUT
+        return ''.join(str(random.randint(0, 9)) for _ in range(len(IN)))
+        # for i in str(IN):
+        #     outNums.append(str(random.randint(MIN,MAX)))
+    # return "".join(outNums)
 
 # def address(IN: list) -> dict:
 #     url = "https://my.api.mockaroo.com/address.json"
