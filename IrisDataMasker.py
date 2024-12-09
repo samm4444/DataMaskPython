@@ -229,7 +229,9 @@ def postgreSQL(host:str, db: str, user: str, password: str):
     # Fetch all rows from database
     record = cursor.fetchall()
 
-    print("Data from Database:- ", record)
+    print("Data from Database:- ", record[0])
+
+    connection.close()
 
 
 ### JSON CONFIG SETUP
