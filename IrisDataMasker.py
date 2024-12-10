@@ -140,7 +140,7 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     outputDBCursor = outputDBconnection.cursor()
 
-
+    # multiprocessing
     pool = multiprocessing.Pool()
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
     results = pool.map(partialMaskRow, inputDBRows)
