@@ -61,8 +61,8 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         logger.error("Input database malformed: " + inputDB)
         return
     # get username and password input for db
-    logger.info("Logging into " + inputDBHost)
-    inputDBUsername = input("username =>")
+    logger.info("Logging into input database: " + inputDBHost)
+    inputDBUsername = input("Username:")
     inputDBPassword = getpass()
 
     try:
@@ -114,14 +114,15 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         return
 
     # get username and password input for db if the host is different to the input db
-    logger.info("Logging into " + outputDBHost)
+    logger.info("Logging into output database: " + outputDBHost)
     outputDBUsername = ""
     outputDBPassword = ""
     if outputDBHost == inputDBHost:
         outputDBUsername = inputDBUsername
         outputDBPassword = inputDBPassword
+        logger.info("Reusing username and password")
     else:
-        outputDBUsername = input("username =>")
+        outputDBUsername = input("Username:")
         outputDBPassword = getpass()
 
     try:
@@ -144,7 +145,7 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     pool = multiprocessing.Pool()
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
     results = pool.map(partialMaskRow, inputDBRows)
-    for stmt in tqdm(results, desc="Executing"):
+    for stmt in tqdm(results, desc="Masking"):
         try:    
             outputDBCursor.execute(stmt)    
         except mysql.connector.errors.IntegrityError:
@@ -196,10 +197,13 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     #insertFails = []
 
-    try:        
-        outputDBconnection.commit()
-    except mysql.connector.errors.IntegrityError:
-        pass
+    outputDBconnection.commit()
+
+    logger.info("Masked " + str(outputDBCursor.rowcount) + " rows.")
+
+    inputDBconnection.close()
+    outputDBconnection.close()
+        
         #insertFails.append({"row": row, "error": "IntegrityError"})
 
     # if len(insertFails) > 0:
