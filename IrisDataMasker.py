@@ -145,9 +145,11 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     pool = multiprocessing.Pool()
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
     results = pool.map(partialMaskRow, inputDBRows)
+    rowsMasked = 0
     for stmt in tqdm(results, desc="Masking"):
         try:    
-            outputDBCursor.execute(stmt)    
+            outputDBCursor.execute(stmt)
+            rowsMasked += 1
         except mysql.connector.errors.IntegrityError:
             pass
         
@@ -199,7 +201,7 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     outputDBconnection.commit()
 
-    logger.info("Masked " + str(outputDBCursor.rowcount) + " rows.")
+    logger.info("Masked " + str(rowsMasked) + " rows.")
 
     inputDBconnection.close()
     outputDBconnection.close()
