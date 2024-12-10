@@ -2,8 +2,14 @@
 
 Mask specific fields from a mySQL database table and export to a seperate database/table.
 
+## Installation
 
-
+1. Download
+2. Run
+   ```
+   pip install -r requirements.txt
+   ```
+3. Start masking!
 
 ## Usage
 
