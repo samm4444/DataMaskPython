@@ -1,6 +1,6 @@
 # IrisDataMasker
 
-Mask specific fields from a mySQL database table and export to a seperate database/table.
+Mask specific fields from a mySQL database table and export to a separate database/table.
 
 ## Installation
 
