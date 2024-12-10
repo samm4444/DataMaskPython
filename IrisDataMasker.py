@@ -17,13 +17,6 @@ logger = logging.getLogger(__name__)
 
 __version__ = "1.0.1"
 
-# open secrets file and import all client secrets.
-secrets = {}
-with open("secrets", "w+") as f:
-    for line in f.readlines():
-        ld = line.split("=")
-        secrets[ld[0]] = ld[1]
-
 @arguably.command
 def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     '''
@@ -144,8 +137,10 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     # multiprocessing
     pool = multiprocessing.Pool()
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
+    # start masking each row
     results = pool.map(partialMaskRow, inputDBRows)
     rowsMasked = 0
+    # execute insert command for each masked row
     for stmt in tqdm(results, desc="Masking"):
         try:    
             outputDBCursor.execute(stmt)
@@ -155,61 +150,13 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
         
     pool.close()
     
-
-
-    # for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking"):
-    #     # print(columns)
-    #     outputValues = []
-    #     for columnName,i in columns.items():
-    #         inputData = row[i]
-
-    #         if columnName not in configData.keys(): outputValues.append("".join(['"',str(inputData),'"'])); continue; # ignore fields not specified for masking
-
-    #         maskSettings = configData[columnName] # get masking settings for this column
-
-    #         maskingType = maskSettings["maskingType"]
-    #         if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
-
-    #         if maskingType == "regex": # Mask data with REGEX
-    #             outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "redact": # Mask data with Redact
-    #             outputData = redact(inputData,maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "partial": # Mask data with Partial Redact
-    #             outputData = partialRedact(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "scrambleInt":
-    #             length = None
-    #             if maskSettings["length"].lower() != "none":
-    #                 length = int(maskSettings["length"])
-    #             outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         else: # Fail due to unknown masking type in config file
-    #             logger.error("Unsupported Masking Type: " + maskingType)
-    #             return
-        
-    #     outputRowSTR = "".join(["(",','.join(outputValues),")"])
-
-    #     outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
-
-    #insertFails = []
-
     outputDBconnection.commit()
 
     logger.info("Masked " + str(rowsMasked) + " rows.")
 
     inputDBconnection.close()
     outputDBconnection.close()
-        
-        #insertFails.append({"row": row, "error": "IntegrityError"})
 
-    # if len(insertFails) > 0:
-    #     logger.error(str(len(insertFails)) + " rows couldn't be inserted")
 
 
 def maskRow(row, columns, configData, outputDBTable, outputColumns):
@@ -253,7 +200,7 @@ def maskRow(row, columns, configData, outputDBTable, outputColumns):
     return "".join(["INSERT INTO ",outputDBTable," ",outputColumns," VALUES ",outputRowSTR,";"])    
 
 
-### POSTGRESQL TEST
+### POSTGRESQL TEST (this can be deleted)
 
 @arguably.command
 def postgreSQL(host:str, db: str, user: str, password: str):
@@ -307,10 +254,13 @@ def setup(filename: str):
 
     with open(filename,"w+") as f:
         f.write(jsonData)
+
+
+
 @arguably.command
 def clean(database: str):
     '''
-    Remove all the records from the table 
+    Remove all the records from the table. Used for debugging + testing.
 
     Args:
         database (str): The address of the input database. Format: host:database:table
@@ -358,6 +308,7 @@ def clean(database: str):
         print("Stopping without removing any rows!")
 
 
+# all the masking functions and the parameters they need to get from the user.
 masks = [{"id": "redact",
           "displayName":"Redact",
           "params": [
@@ -444,7 +395,12 @@ def getMaskConfig() -> dict:
     paramDisplayName = param["displayName"]
     paramDescription = param["description"]
     paramType = param["type"]
-
+    try:
+        param["value"]
+        config[paramId] = param["value"]
+        continue
+    except:
+        pass
     print(paramDisplayName)
     print(paramDescription)
     if paramType == "str":
@@ -459,7 +415,7 @@ def getMaskConfig() -> dict:
   return config
 
 
-### REDACT FUNCTIONS
+### MASKING FUNCTIONS
 
 
 def partialRedact(IN: str, visiblePrefix: int, visibleSuffix: int, maskingChar: str):
@@ -528,42 +484,10 @@ def scrambleInt(IN: str, MIN: int = 0, MAX: int = 9, length: int = None) -> str:
     Returns:
         str: The output sequence
     """
-    # OUT = ""
-    # outNums = []
     if length != None:
         return ''.join(str(random.randint(0, 9)) for _ in range(length))
-        # for _ in range(length):
-        #     outNums.append(str(random.randint(MIN,MAX)))
     else:
         return ''.join(str(random.randint(0, 9)) for _ in range(len(IN)))
-        # for i in str(IN):
-        #     outNums.append(str(random.randint(MIN,MAX)))
-    # return "".join(outNums)
-
-# def address(IN: list) -> dict:
-#     url = "https://my.api.mockaroo.com/address.json"
-
-#     payload = {}
-#     headers = {
-#     'X-API-Key': secrets["mockaroo"]
-#     }
-
-#     response = requests.request("GET", url, headers=headers, data=payload)
-#     data = response.text.split(",")
-#     addressData = {}
-#     addressData["streetNumber"] = data[0].strip()
-#     addressData["streetName"] = data[1].strip()
-#     addressData["streetSuffix"] = data[2].strip()
-#     addressData["street"] = addressData["streetName"] + " " + addressData["streetSuffix"]
-#     addressData["streetAddress"] = addressData["streetNumber"] + " " + addressData["street"]
-#     addressData["city"] = data[3].strip()
-#     addressData["country"] = data[4].strip()
-#     addressData["postcode"] = data[5].strip()
-
-#     OUT = {}
-#     for i in IN:
-#         OUT[i] = addressData[i]
-#     return OUT
     
 
 if __name__ == "__main__":
