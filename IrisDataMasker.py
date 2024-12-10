@@ -145,7 +145,11 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
     results = pool.map(partialMaskRow, inputDBRows)
     for stmt in tqdm(results, desc="Executing"):
-        outputDBCursor.execute(stmt)
+        try:    
+            outputDBCursor.execute(stmt)    
+        except mysql.connector.errors.IntegrityError:
+            pass
+        
     pool.close()
     
 
@@ -190,15 +194,16 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     #     outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
 
-    insertFails = []
+    #insertFails = []
 
     try:        
         outputDBconnection.commit()
     except mysql.connector.errors.IntegrityError:
-        insertFails.append({"row": row, "error": "IntegrityError"})
+        pass
+        #insertFails.append({"row": row, "error": "IntegrityError"})
 
-    if len(insertFails) > 0:
-        logger.error(str(len(insertFails)) + " rows couldn't be inserted")
+    # if len(insertFails) > 0:
+    #     logger.error(str(len(insertFails)) + " rows couldn't be inserted")
 
 
 def maskRow(row, columns, configData, outputDBTable, outputColumns):
