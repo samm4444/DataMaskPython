@@ -15,7 +15,7 @@ from functools import partial
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 # open secrets file and import all client secrets.
 secrets = {}
@@ -140,6 +140,19 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     outputDBCursor = outputDBconnection.cursor()
 
+    # Check for columns not specified for masking, and alert the user for confimation.
+    inputColumnNames = [name[0].lower() for name in columns.items()]
+    configColumnNames = [name[0].lower() for name in configData.items()]
+    result = list(set(inputColumnNames) - set(configColumnNames))
+    if len(result) > 0:
+        logger.warning("The following fields will be copied without masking:")
+        for i in result:
+            logger.warning(i)
+        print("Are you sure you want to proceed (y/N): ", end="")
+        proceed = input()
+        if proceed.lower() != "y":
+            print("Stopping.")
+            return 
 
     pool = multiprocessing.Pool()
     partialMaskRow = partial(maskRow,columns=columns, configData=configData, outputDBTable=outputDBTable, outputColumns=outputColumns)
@@ -151,59 +164,12 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
             pass
         
     pool.close()
-    
-
-
-    # for row in tqdm(inputDBRows, total=len(inputDBRows),desc="Masking"):
-    #     # print(columns)
-    #     outputValues = []
-    #     for columnName,i in columns.items():
-    #         inputData = row[i]
-
-    #         if columnName not in configData.keys(): outputValues.append("".join(['"',str(inputData),'"'])); continue; # ignore fields not specified for masking
-
-    #         maskSettings = configData[columnName] # get masking settings for this column
-
-    #         maskingType = maskSettings["maskingType"]
-    #         if maskingType == None: raise ValueError("No Masking type for field: " + columnName)
-
-    #         if maskingType == "regex": # Mask data with REGEX
-    #             outputData = regex(inputData,maskSettings["pattern"],maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "redact": # Mask data with Redact
-    #             outputData = redact(inputData,maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "partial": # Mask data with Partial Redact
-    #             outputData = partialRedact(inputData,maskSettings["visiblePrefix"],maskSettings["visibleSuffix"],maskSettings["replacement"])
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         elif maskingType == "scrambleInt":
-    #             length = None
-    #             if maskSettings["length"].lower() != "none":
-    #                 length = int(maskSettings["length"])
-    #             outputData = scrambleInt(inputData,maskSettings["min"],maskSettings["max"],length)
-    #             outputValues.append("".join(['"',str(outputData),'"']))
-    #             continue
-    #         else: # Fail due to unknown masking type in config file
-    #             logger.error("Unsupported Masking Type: " + maskingType)
-    #             return
-        
-    #     outputRowSTR = "".join(["(",','.join(outputValues),")"])
-
-    #     outputDBCursor.execute("INSERT INTO " + outputDBTable + " " + outputColumns + " VALUES " + outputRowSTR + ";")    
-
-    #insertFails = []
 
     try:        
         outputDBconnection.commit()
+        pass
     except mysql.connector.errors.IntegrityError:
         pass
-        #insertFails.append({"row": row, "error": "IntegrityError"})
-
-    # if len(insertFails) > 0:
-    #     logger.error(str(len(insertFails)) + " rows couldn't be inserted")
 
 
 def maskRow(row, columns, configData, outputDBTable, outputColumns):
@@ -246,36 +212,6 @@ def maskRow(row, columns, configData, outputDBTable, outputColumns):
 
     return "".join(["INSERT INTO ",outputDBTable," ",outputColumns," VALUES ",outputRowSTR,";"])    
 
-
-### POSTGRESQL TEST
-
-@arguably.command
-def postgreSQL(host:str, db: str, user: str, password: str):
-    '''
-    postresql test 
-
-    Args:
-        host (str): host
-        db (str): db
-        user (str): user
-        password (str): pass
-    '''
-    import psycopg2
-
-    connection = psycopg2.connect(database=db, user=user, password=password, host=host)
-
-    cursor = connection.cursor()
-
-    cursor.execute("SELECT * FROM userSensitive;")
-
-    # Fetch all rows from database
-    record = cursor.fetchall()
-
-    print("Data from Database:- ", record[0])
-
-    connection.close()
-
-
 ### JSON CONFIG SETUP
 
 
@@ -301,56 +237,6 @@ def setup(filename: str):
 
     with open(filename,"w+") as f:
         f.write(jsonData)
-@arguably.command
-def clean(database: str):
-    '''
-    Remove all the records from the table 
-
-    Args:
-        database (str): The address of the input database. Format: host:database:table
-    '''
-
-    DBdata = database.split(":")
-    try:
-        DBHost = DBdata[0]
-        DatabaseName = DBdata[1]
-        DBTable = DBdata[2]
-    except IndexError:
-        logger.error("Input database malformed: " + database)
-        return
-    # get username and password input for db
-    logger.info("Logging into " + DBHost)
-    DBUsername = input("username =>")
-    DBPassword = getpass()
-    try:
-    # establish database connection with credentials
-        logger.info("Connecting...")
-        DBconnection = mysql.connector.connect(
-        host=DBHost,
-        user=DBUsername,
-        password=DBPassword,
-        database=DatabaseName
-        )
-    except mysql.connector.errors.ProgrammingError:
-        logger.error("Failed to connect to database")
-        return
-    logger.info("Connection Successful")
-
-    DBCursor = DBconnection.cursor()
-    logger.debug("Created input database cursor")
-
-    logger.info("Loading data from table: " + DBTable)
-    
-    print("Are you sure you want to remove all records from " + DatabaseName + " - " + DBTable + "? Type YES to confirm.")
-    confirmation = input()
-    if confirmation == "YES":
-        print("Deleting...")
-        DBCursor.execute("DELETE FROM "+DBTable+";")
-        DBconnection.commit()
-        print(str(DBCursor.rowcount) + " rows removed!")
-    else:
-        print("Stopping without removing any rows!")
-
 
 masks = [{"id": "redact",
           "displayName":"Redact",
@@ -522,42 +408,11 @@ def scrambleInt(IN: str, MIN: int = 0, MAX: int = 9, length: int = None) -> str:
     Returns:
         str: The output sequence
     """
-    # OUT = ""
-    # outNums = []
     if length != None:
         return ''.join(str(random.randint(0, 9)) for _ in range(length))
-        # for _ in range(length):
-        #     outNums.append(str(random.randint(MIN,MAX)))
     else:
         return ''.join(str(random.randint(0, 9)) for _ in range(len(IN)))
-        # for i in str(IN):
-        #     outNums.append(str(random.randint(MIN,MAX)))
-    # return "".join(outNums)
 
-# def address(IN: list) -> dict:
-#     url = "https://my.api.mockaroo.com/address.json"
-
-#     payload = {}
-#     headers = {
-#     'X-API-Key': secrets["mockaroo"]
-#     }
-
-#     response = requests.request("GET", url, headers=headers, data=payload)
-#     data = response.text.split(",")
-#     addressData = {}
-#     addressData["streetNumber"] = data[0].strip()
-#     addressData["streetName"] = data[1].strip()
-#     addressData["streetSuffix"] = data[2].strip()
-#     addressData["street"] = addressData["streetName"] + " " + addressData["streetSuffix"]
-#     addressData["streetAddress"] = addressData["streetNumber"] + " " + addressData["street"]
-#     addressData["city"] = data[3].strip()
-#     addressData["country"] = data[4].strip()
-#     addressData["postcode"] = data[5].strip()
-
-#     OUT = {}
-#     for i in IN:
-#         OUT[i] = addressData[i]
-#     return OUT
     
 
 if __name__ == "__main__":

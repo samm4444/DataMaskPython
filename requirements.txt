@@ -2,4 +2,3 @@ arguably
 mysql-connector-python
 requests
 tqdm
-psycopg2

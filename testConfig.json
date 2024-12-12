@@ -1,1 +1,37 @@
-{"fields": {"surname": {"maskingType": "redact", "replacement": "#"}, "addressLine1": {"maskingType": "redact", "replacement": "#"}, "city": {"maskingType": "redact", "replacement": "#"}, "country": {"maskingType": "redact", "replacement": "#"}, "postcode": {"maskingType": "partial", "replacement": "#", "visiblePrefix": 2, "visibleSuffix": 0}, "phoneNumber": {"maskingType": "scrambleInt", "min": 0, "max": 9, "length": "None"}, "email": {"maskingType": "regex", "replacement": "######", "pattern": "(?<=^.).+(?=.*@)"}}}
+{
+  "fields": {
+    "surname": {
+      "maskingType": "redact",
+      "replacement": "#"
+    },
+    "addressLine1": {
+      "maskingType": "redact",
+      "replacement": "#"
+    },
+    "city": {
+      "maskingType": "redact",
+      "replacement": "#"
+    },
+    "country": {
+      "maskingType": "redact",
+      "replacement": "#"
+    },
+    "postcode": {
+      "maskingType": "partial",
+      "replacement": "#",
+      "visiblePrefix": 2,
+      "visibleSuffix": 0
+    },
+    "phoneNumber": {
+      "maskingType": "scrambleInt",
+      "min": 0,
+      "max": 9,
+      "length": "None"
+    },
+    "email": {
+      "maskingType": "regex",
+      "replacement": "######",
+      "pattern": "(?<=^.).+(?=.*@)"
+    }
+  }
+}
