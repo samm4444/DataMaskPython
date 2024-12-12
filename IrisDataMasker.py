@@ -167,7 +167,6 @@ def mask(inputDB: str, outputDB: str, config: str, *, logLevel: str = "INFO"):
 
     try:        
         outputDBconnection.commit()
-        pass
     except mysql.connector.errors.IntegrityError:
         pass
 
